@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart'; // Importa la librería Flutter
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uts_mentor/database/chat.dart';
+import 'package:uts_mentor/database/class/tutor.dart';
+import 'package:uts_mentor/database/database.dart';
+import 'home_page.dart';
+import 'PerfilPage.dart';
+import 'TutoriasPage.dart';
+import 'dataLocalUser.dart';
 
 void main() {
   runApp(
@@ -18,231 +25,138 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors
             .blue, // Configura el tema de la aplicación con un color azul.
       ),
-      initialRoute: '/', // Ruta inicial de la aplicación.
+      initialRoute:
+          '/', // La ruta inicial de la app será la pantalla de autenticación.
       routes: {
-        '/': (context) =>
-            AuthScreen(), // Define una ruta llamada '/' que muestra AuthScreen.
-        '/register': (context) => RegisterScreen(),
+        '/': (context) => AuthScreen(),
+        // '/': (context) => HomePage(),
         '/home': (context) =>
-            HomePage(), // Define una ruta llamada '/register' que muestra RegisterScreen.
+            HomePage(), // Redirige a la pagina de inicio en el home_page.dart
+        '/register': (context) => RegisterScreen(),
+        '/chat': (context) => ChatPage(),
+        '/profile': (context) => PerfilPage(),
+        '/addtutoria': (context) => TutoriasPage()
       },
     );
   }
 }
 
 class AuthScreen extends StatefulWidget {
-  // Define una clase llamada AuthScreen que extiende StatefulWidget.
   @override
-  _AuthScreenState createState() =>
-      _AuthScreenState(); // Crea el estado para AuthScreen.
+  _AuthScreenState createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  // Define el estado de AuthScreen.
-  TextEditingController emailController =
-      TextEditingController(); // Controlador para el campo de correo electrónico.
-  TextEditingController passwordController =
-      TextEditingController(); // Controlador para el campo de contraseña.
-  bool isRegistered =
-      false; // Variable booleana que indica si el usuario está registrado.
-  bool isLoggedIn =
-      false; // Variable booleana que indica si el usuario ha iniciado sesión.
-  String? registeredEmail; // Almacena el correo electrónico registrado.
-  String? registeredPassword; // Almacena la contraseña registrada.
+  TextEditingController emailController = TextEditingController();
+  TextEditingController passwordController = TextEditingController();
+  bool isLoggedIn = false;
 
-  void register() async {
-    // Función para registrar un usuario.
-    final result = await Navigator.pushNamed(context,
-        '/register'); // Abre la pantalla de registro y espera un resultado.
-    if (result != null && result is Map<String, String>) {
-      // Comprueba si se recibió un resultado válido.
-      setState(() {
-        // Actualiza el estado de la aplicación.
-        isRegistered = true;
-        registeredEmail =
-            result['email']; // Almacena el correo electrónico registrado.
-        registeredPassword =
-            result['password']; // Almacena la contraseña registrada.
-      });
-    }
-  }
+  void login() async {
+    final enteredEmail = emailController.text;
+    final enteredPassword = passwordController.text;
 
-  void login() {
-    // Función para iniciar sesión.
-    if (isRegistered) {
-      // Comprueba si el usuario está registrado.
-      final enteredEmail =
-          emailController.text; // Obtiene el correo electrónico ingresado.
-      final enteredPassword =
-          passwordController.text; // Obtiene la contraseña ingresada.
+    final db = await DatabaseHelper().database;
+    final List<Map<String, dynamic>> result = await db.query(
+      DatabaseHelper.userTable,
+      where: 'email = ?',
+      whereArgs: [enteredEmail],
+    );
 
-      if (enteredEmail == registeredEmail &&
-          enteredPassword == registeredPassword) {
-        // Comprueba las credenciales.
+    print(result);
+    // saveUserData(id, nombre, email)
+
+    if (result.isNotEmpty) {
+      final user = Usuario.fromMap(result.first);
+
+      print(user);
+      saveUserData(user.id.toString(), user.nombre, user.email);
+
+      // Aquí puedes agregar tu lógica de cifrado si la contraseña está cifrada.
+      if (user.password == enteredPassword) {
         setState(() {
-          // Actualiza el estado de la aplicación.
-          isLoggedIn = true; // Marca al usuario como autenticado.
+          isLoggedIn = true;
         });
+        // Redirigir a la página de inicio
+        Navigator.pushReplacementNamed(context, '/home');
       } else {
-        // Credenciales incorrectas, muestra un diálogo de error.
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Error de inicio de sesión'),
-              content: const Text(
-                  'Credenciales incorrectas. Verifica tu correo y contraseña.'),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Cerrar'),
-                ),
-              ],
-            );
-          },
-        );
+        showErrorDialog('Contraseña incorrecta.');
       }
     } else {
-      // El usuario no está registrado, muestra un diálogo de error.
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Error de inicio de sesión'),
-            content: const Text('Debes registrarte antes de iniciar sesión.'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Cerrar'),
-              ),
-            ],
-          );
-        },
-      );
+      showErrorDialog('El correo electrónico no está registrado.');
     }
+  }
+
+  void showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Error de inicio de sesión'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Método para construir la interfaz de AuthScreen.
-    if (isLoggedIn) {
-      // Si el usuario ha iniciado sesión, muestra la pantalla HelloWorldScreen.
-      return HomePage();
-    } else {
-      // Si no ha iniciado sesión, muestra la pantalla de inicio de sesión o registro.
-      return Scaffold(
-        appBar: AppBar(
-          title: Center(child: Text('Inicio de Sesión o Registro')),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              GestureDetector(
-                // Widget GestureDetector envuelve el contenido para detectar gestos del usuario.
-                onTap: () {
-                  // Cuando se toque el contenido, se ejecutará esta función anónima.
-                  // Abre la URL del hipervínculo
-                  launchUrl(Uri.parse(
-                      "https://www.youtube.com")); // Abre la URL de Google en el navegador.
-                },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(200),
-                  child: Image.asset(
-                    'imagenes/logoMentor.jpg',
-                    width: 300,
-                    height: 300,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-
-              Container(
-                width: 400, // Ancho de la imagen en píxeles.
-                child: TextField(
-                  controller: emailController,
-                  decoration:
-                      const InputDecoration(labelText: 'Correo Electrónico'),
-                ),
-              ),
-
-              Container(
-                width: 400, // Ancho de la imagen en píxeles.
-                height: 70, // Alto de la imagen en píxeles.
-                child: TextField(
-                  controller: passwordController,
-                  decoration: const InputDecoration(labelText: 'Contraseña'),
-                  obscureText: true, // Oculta el texto de la contraseña.
-                ),
-              ),
-
-              ElevatedButton(
-                onPressed: login, // Llama a la función de inicio de sesión.
-                child: const Text('Iniciar Sesión'),
-              ),
-
-              const SizedBox(
-                  height:
-                      10), // Agrega un espacio de 20 puntos entre el TextField y el botón
-
-              TextButton(
-                onPressed: register, // Llama a la función de registro.
-                child: const Text('¿No tienes una cuenta? Regístrate aquí.'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-  }
-}
-
-class RegisterScreen extends StatelessWidget {
-  // Define una clase llamada RegisterScreen que extiende StatelessWidget.
-  @override
-  Widget build(BuildContext context) {
-    // Método para construir la interfaz de RegisterScreen.
-    TextEditingController registerEmailController =
-        TextEditingController(); // Controlador para el correo electrónico de registro.
-    TextEditingController registerPasswordController =
-        TextEditingController(); // Controlador para la contraseña de registro.
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registro'),
+        title: Center(child: Text('Inicio de Sesión o Registro')),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            TextField(
-              controller: registerEmailController,
-              decoration:
-                  const InputDecoration(labelText: 'Correo Electrónico'),
+            GestureDetector(
+              onTap: () {
+                launchUrl(Uri.parse("https://www.youtube.com"));
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(200),
+                child: Image.asset(
+                  'imagenes/logoMentor.jpg',
+                  width: 300,
+                  height: 300,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
-            TextField(
-              controller: registerPasswordController,
-              decoration: const InputDecoration(labelText: 'Contraseña'),
-              obscureText: true, // Oculta el texto de la contraseña.
+            Container(
+              width: 400,
+              child: TextField(
+                controller: emailController,
+                decoration:
+                    const InputDecoration(labelText: 'Correo Electrónico'),
+              ),
+            ),
+            Container(
+              width: 400,
+              height: 70,
+              child: TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(labelText: 'Contraseña'),
+                obscureText: true,
+              ),
             ),
             ElevatedButton(
+              onPressed: login,
+              child: const Text('Iniciar Sesión'),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
               onPressed: () {
-                final registerEmail = registerEmailController
-                    .text; // Obtiene el correo electrónico ingresado.
-                final registerPassword = registerPasswordController
-                    .text; // Obtiene la contraseña ingresada.
-                final result = {
-                  'email': registerEmail,
-                  'password': registerPassword
-                }; // Crea un mapa con los datos de registro.
-                Navigator.pop(context,
-                    result); // Cierra la pantalla de registro y devuelve los datos al estado anterior.
+                Navigator.pushNamed(context, '/register');
               },
-              child: const Text('Registrarse'),
+              child: const Text('¿No tienes una cuenta? Regístrate aquí.'),
             ),
           ],
         ),
@@ -251,125 +165,137 @@ class RegisterScreen extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Home'),
-        actions: <Widget>[
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: GestureDetector(
-              onTap: () {
-                // Agrega tu función para manejar el toque aquí
-                print('Botón de perfil tocado');
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white, // Color de fondo del botón
-                  borderRadius: BorderRadius.circular(10), // Bordes redondeados
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  mainAxisSize: MainAxisSize
-                      .min, // Para que el Row ocupe el espacio mínimo necesario
-                  children: <Widget>[
-                    Icon(Icons.person,
-                        color: const Color.fromARGB(
-                            255, 17, 18, 19)), // Icono del usuario
-                    SizedBox(
-                      width: 10,
-                      height: 100,
-                    ), // Espacio entre el icono y el texto
-                    Text('Nombre de usuario',
-                        style: TextStyle(
-                            color: const Color.fromARGB(255, 24, 27,
-                                29))), // Texto para el nombre del usuario
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Center(
-              child: TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Icon(Icons.outbox),
-          )),
-        ],
-      ),
-      body: Column(
-        children: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Icon(Icons.outbox),
-          ),
-        ],
-      ),
-    );
-  }
-}
+class RegisterScreen extends StatelessWidget {
+  final TextEditingController registerNombreController =
+      TextEditingController();
+  final TextEditingController registerApellidosController =
+      TextEditingController();
+  final TextEditingController registerCedulaController =
+      TextEditingController();
+  final TextEditingController registerEmailController = TextEditingController();
+  final TextEditingController registerPasswordController =
+      TextEditingController();
+  final TextEditingController registerAreaController = TextEditingController();
+  final TextEditingController registerRolController = TextEditingController();
 
-class HelloWorldScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('¡Hola Mundo!'),
+        title: const Text('Registro'),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center, // Centra verticalmente la columna
-          crossAxisAlignment:
-              CrossAxisAlignment.center, // Centra horizontalmente la columna
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment
-                  .center, // Centra horizontalmente los textos dentro del Row
-              crossAxisAlignment: CrossAxisAlignment
-                  .center, // Centra verticalmente los textos dentro del Row
-              children: [
-                Image.asset(
-                  'imagenes/instagram.jpeg',
-                  width: 100,
-                  height: 200,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 20, vertical: 10), // Padding for the form
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              const Text(
+                'Registro de Usuario',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color.fromARGB(255, 57, 150, 53),
                 ),
-                Image.asset(
-                  'imagenes/spotify.png',
-                  width: 200,
-                  height: 200,
+              ),
+              const SizedBox(height: 20), // Space between title and fields
+              TextField(
+                controller: registerNombreController,
+                decoration: InputDecoration(
+                  labelText: 'Nombre',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
                 ),
-              ],
-            ),
-            const SizedBox(height: 20), // Espacio entre las filas
-            Row(
-              mainAxisAlignment: MainAxisAlignment
-                  .center, // Centra horizontalmente los textos dentro del Row
-              crossAxisAlignment: CrossAxisAlignment
-                  .center, // Centra verticalmente los textos dentro del Row
-              children: [
-                GestureDetector(
-                  /* child: Image.asset(
-                    'imagenes/whatsapp.jpeg',
-                    width: 150,
-                    height: 200,
-                  ) */
-                  child: ButtonTheme(
-                    child: const Text('data'),
-                  ),
-                  onTap: () {
-                    print('object');
-                  },
-                )
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: registerApellidosController,
+                decoration: InputDecoration(
+                  labelText: 'Apellidos',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: registerCedulaController,
+                decoration: InputDecoration(
+                  labelText: 'Cédula',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: registerEmailController,
+                decoration: InputDecoration(
+                  labelText: 'Correo Electrónico',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: registerPasswordController,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: registerAreaController,
+                decoration: InputDecoration(
+                  labelText: 'Area',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+              ),
+              /*  const SizedBox(height: 15),
+              TextField(
+                controller: registerRolController,
+                decoration: InputDecoration(
+                  labelText: 'Rol (tutor/estudiante/ambos)',
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                ),
+              ), */
+              const SizedBox(height: 25),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
+                onPressed: () async {
+                  final usuario = Usuario(
+                      nombre: registerNombreController.text,
+                      apellidos: registerApellidosController.text,
+                      email: registerEmailController.text,
+                      cedula: registerCedulaController.text,
+                      area: registerAreaController.text,
+                      password: registerPasswordController.text,
+                      // rol: registerRolController.text ,
+                      rol: 'estudiante');
+                  // Insertar en la base de datos
+                  await DatabaseHelper().insertUsuario(usuario);
+
+                  Navigator.pop(context); // Regresar a la pantalla de login
+                },
+                child: const Text('Registrarse'),
+              ),
+            ],
+          ),
         ),
       ),
     );
